@@ -23,6 +23,7 @@ python -m venv venv
 pip install torch torchvision torchaudio
 pip install transformers
 pip install fastapi uvicorn pillow
+pip install python-multipart
 ```
 
 ---
