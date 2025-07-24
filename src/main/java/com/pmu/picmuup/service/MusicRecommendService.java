@@ -3,11 +3,11 @@ package com.pmu.picmuup.service;
 import com.pmu.picmuup.dto.RecommendResponseDto;
 import com.pmu.picmuup.dto.ScoredMusic;
 import com.pmu.picmuup.entity.Music;
+import com.pmu.picmuup.exception.InvalidRecommendRequestException;
 import com.pmu.picmuup.repository.MusicRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.io.ByteArrayResource;
-import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
@@ -16,11 +16,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Stream;
 
 @Service
@@ -59,7 +55,7 @@ public class MusicRecommendService {
     }
 
     // 텍스트 벡터 추출
-    public List<Float> getTextEmbedding(String text) throws IOException{
+    public List<Float> getTextEmbedding(String text){
         System.out.println("전송하는 텍스트: " + text);
         return Objects.requireNonNull(webClient.post()
                         .uri("http://localhost:8000/embed/text")
@@ -80,10 +76,37 @@ public class MusicRecommendService {
     }
 
     // 텍스트를 통한 추천 실행
-    public List<RecommendResponseDto> recommendByText(String text) throws IOException {
+    public List<RecommendResponseDto> recommendByText(String text){
         List<Float> textEmbedding = getTextEmbedding(text);
 
         return recommendByEmbedding(textEmbedding);
+    }
+
+    // 이미지와 텍스트를 통한 추천 실행
+    public List<RecommendResponseDto> recommendByImageAndText(MultipartFile imageFile, String text) throws IOException {
+
+        if ((imageFile == null || imageFile.isEmpty()) && (text == null || text.isBlank())) {
+            throw new InvalidRecommendRequestException("파일 또는 텍스트 중 하나는 필요합니다.");
+        }
+
+        if (imageFile == null || imageFile.isEmpty()) {
+            return recommendByText(text);
+        }
+        if (text == null || text.isBlank()) {
+            return recommendByImage(imageFile);
+        }
+
+        List<Float> imageEmbedding = getImageEmbedding(imageFile);
+        List<Float> textEmbedding = getTextEmbedding(text);
+
+        // 둘의 평군 벡터 계산
+        List<Float> imageAndTextEmbedding = new ArrayList<>();
+
+        for (int i = 0; i < imageEmbedding.size(); i++) {
+            imageAndTextEmbedding.add((imageEmbedding.get(i) + textEmbedding.get(i)) / 2);
+        }
+
+        return recommendByEmbedding(imageAndTextEmbedding);
     }
 
     private List<RecommendResponseDto> recommendByEmbedding(List<Float> queryEmbedding) {
@@ -101,20 +124,6 @@ public class MusicRecommendService {
                 .toList();
     }
 
-    // 내부 클래스: 파일 리소스 어댑터
-    static class MultipartInputStreamFileResource extends InputStreamResource {
-        private final String filename;
-
-        public MultipartInputStreamFileResource(InputStream inputStream, String filename) {
-            super(inputStream);
-            this.filename = filename;
-        }
-
-        @Override
-        public String getFilename() {
-            return filename;
-        }
-    }
 
     private List<Double> parseEmbedding(String embeddingString) {
         return Stream.of(embeddingString.replace("[", "").replace("]", "").split(","))

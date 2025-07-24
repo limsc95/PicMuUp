@@ -20,7 +20,7 @@ public class MusicRecommendController {
 
     private final MusicRecommendService musicRecommendService;
 
-    //@PostMapping("/image")
+    // 이미지를 통한 추천
     @PostMapping(value = "/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public List<RecommendResponseDto> recommendFromImage(
             @RequestParam("file") MultipartFile file) throws IOException {
@@ -28,11 +28,19 @@ public class MusicRecommendController {
         return musicRecommendService.recommendByImage(file);
     }
 
+    // 텍스트를 통한 추천
     @PostMapping("/text")
-    public List<RecommendResponseDto> recommendFromText(
-            @RequestParam("text") String text
-    ) throws IOException {
+    public List<RecommendResponseDto> recommendFromText(@RequestParam("text") String text){
 
         return musicRecommendService.recommendByText(text);
+    }
+
+    // 이미지와 텍스트 모두를 통한 추천
+    @PostMapping(value = "/combined", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public List<RecommendResponseDto> recommendFromImageAndText(
+            @RequestParam(value = "file", required = false) MultipartFile file,
+            @RequestParam(value = "text", required = false) String text) throws IOException {
+
+        return musicRecommendService.recommendByImageAndText(file, text);
     }
 }
